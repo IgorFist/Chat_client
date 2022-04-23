@@ -1,5 +1,5 @@
 # Chat client project
-This repo is client for [Chat client](https://github.com/IgorFist/Chat_server).
+This repo is client for [Chat server](https://github.com/IgorFist/Chat_server).
 
 For chat starting needed:
 
