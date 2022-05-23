@@ -3,13 +3,12 @@
 #include <iomanip>
 #include <chrono>
 
-Client::Client(io::io_context &io_context) : io_context(io_context), socket(io_context)
+Client::Client(io::io_context &io_context) : io_context(io_context), socket(io_context), connectionClosed(false)
 {
 }
 
-bool Client::connect(const tcp::resolver::iterator &endpoint_iterator)
+bool Client::connect(const tcp::resolver::iterator &endpoint_iterator, boost::system::error_code& ec)
 {
-    boost::system::error_code ec;
     io::connect(socket, endpoint_iterator, ec);
 
     if (!ec)
@@ -17,7 +16,6 @@ bool Client::connect(const tcp::resolver::iterator &endpoint_iterator)
         do_read_header();
         return true;
     }
-    std::cerr << ec.message() << std::endl;
     return false;
 }
 
@@ -40,9 +38,14 @@ void Client::close()
 {
     io_context.post([this]()
     { 
-                        boost::system::error_code ec;
-                        socket.shutdown(tcp::socket::shutdown_both, ec);
+        boost::system::error_code ec;
+        socket.shutdown(tcp::socket::shutdown_both, ec);
     });
+}
+
+bool Client::isClosed() const
+{
+    return connectionClosed;
 }
 
 std::_Put_time<char> Client::getCurrentTime()
@@ -56,12 +59,14 @@ void Client::do_read_header()
 
     io::async_read(socket, io::buffer(header), [this](const boost::system::error_code &ec, std::size_t)
     {
-        if(!ec  || ec == boost::asio::error::eof)
+        if(!ec)
         {
             do_read_body();
         }
         else
         {
+
+            connectionClosed = true;
             socket.close();
         } 
     });
@@ -85,6 +90,7 @@ void Client::do_read_body()
         }
         else
         {
+            connectionClosed = true;
             socket.close();
         } 
     });
@@ -104,7 +110,14 @@ void Client::do_write()
         }
         else
         {
+            connectionClosed = true;
             socket.close();
         } 
     });
+}
+
+void Client::closeSocket()
+{
+    connectionClosed = true;
+    socket.close();
 }

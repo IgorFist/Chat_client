@@ -1,6 +1,7 @@
 #include <client.h>
 #include <iostream>
 #include <thread>
+#include <exception>
 
 int main(int argc, char *argv[])
 {
@@ -16,32 +17,38 @@ int main(int argc, char *argv[])
         tcp::resolver resolver(io_context);
         auto endpoint_iterator = resolver.resolve(argv[1], argv[2]);
         Client client(io_context);
-
-        std::string message;
+        boost::system::error_code ec;
         //wait for connect
-        if (client.connect(endpoint_iterator))
+        if (client.connect(endpoint_iterator, ec))
         {
+            std::string message;
+            std::thread t([&io_context]
+                        { 
+                             io_context.run(); 
+                            
+                        });
 
-            std::thread t([&io_context]()
-                          { io_context.run(); });
-
-            // std::time_t time = std::time(nullptr);
-            // std::cout << "[" << std::ctime(&time) << "] ";
             while (std::getline(std::cin, message))
             {
-                std::cout << "\x1b[1A" // move cursor up one 
-                          << "\x1b[2K"; // delete the entire line
-                std::cout << "[" << Client::getCurrentTime() << "] " << message << std::endl;
+                if(!client.isClosed() && message != "/exit"){
+                    std::cout << "\x1b[1A" // move cursor up one 
+                            << "\x1b[2K"; // delete the entire line
+                    std::cout << "[" << Client::getCurrentTime() << "] " << message << std::endl;
 
-                if (message == "/exit")
+                    client.send_message(message);
+                }
+                else
                     break;
-                client.send_message(message);
             }
 
             client.close();
             t.join();
             std::cout << "session is over\n";
         }
+        else
+            std::cout << "Unable to establish connection: " << ec.message() << std::endl;
+
+       
     }
     catch (const std::exception &e)
     {
